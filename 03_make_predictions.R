@@ -1,5 +1,4 @@
-generate_new_bike <-
-function(bike_model, category_1, category_2, frame_material, .ml_model) {
+generate_new_bike <- function(bike_model, category_1, category_2, frame_material, .ml_model) {
     
 
     new_bike_tbl <- tibble(
@@ -22,8 +21,9 @@ function(bike_model, category_1, category_2, frame_material, .ml_model) {
     
     
 }
-format_table <-
-function(new_bike_tbl) {
+
+
+format_table <- function(new_bike_tbl) {
     
     
     # Here we are formatting our data so we can upload it to an output table correctly
@@ -38,8 +38,9 @@ function(new_bike_tbl) {
         spread(key = model, value = value)
     
 }
-bind_bike_prediction <-
-function(bikes_tbl, new_bike_tbl) {
+
+
+bind_bike_prediction <- function(bikes_tbl, new_bike_tbl) {
     
     
     bikes_tbl %>%
@@ -53,8 +54,9 @@ function(bikes_tbl, new_bike_tbl) {
     
     
 }
-plot_bike_prediction <-
-function(data, interactive = TRUE) {
+
+
+plot_bike_prediction <- function(data, interactive = TRUE) {
     
     g <- data %>%
         # Right now category_2 is ordered alphabetically 
