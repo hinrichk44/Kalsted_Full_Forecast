@@ -10,7 +10,45 @@ runtime: shiny
 ---
 
 
-```{r setup, include=FALSE}
+```{r markdown_basics}
+
+# orientation: rows
+
+# In R Markdown, orientation can be either by columns or rows. Columns are measured by width, rows by height. 
+
+# For this specific document we are using the rows orientation
+
+# vertical_layout: fill
+
+# Fill squishes all charts into the view window.
+
+# Remember to add runtime: shiny to the YAML above in order to integrate Shiny into the flexdashboard document
+
+# runtime: shiny enables using the shiny server to power your flexdashboard app (as opposed to RMarkdown rendering as HTML)
+
+# We can now incorporate Shiny tools like user inputs into our flexdashboard by using runtime: shiny
+
+# Scroll adds a scroll bar. Allows charts to take up full pixel space. 
+
+# data-width = 1000 reserves 1000px for the column layout in R Markdown
+
+# {.sidebar} will create a sidebar in R Markdown
+
+# This is specifically a flexdashboard
+
+# css: css/styles-default.css is how we import our custom CSS styling we set up
+
+# logo: img/business-science-logo.png is how we can add a logo to our app
+
+```
+
+
+```{r setup, include = FALSE}
+
+# Libraries ----
+
+
+# App
 library(flexdashboard)
 library(shiny)
 library(shinyWidgets)
@@ -31,13 +69,23 @@ library(RSQLite)
 library(parsnip)
 library(timetk)
 
+
+
+
+# Sourcing Files ----
+
+
+# source() processes a .R file
+# Any functions in the .R file are run and loaded into memory
 # Here we are going to source in our functions
+# aggregate_time_series(), plot_time_series(), generate_forecast(), and plot_forecast() functions
 source("../00_scripts/04_demand_forecast.R")
+
+
 ```
 
 
-```{css styling default}
-
+```{css styling for switch input}
 
 .bootstrap-switch, .bootstrap-switch-handle-on,
 .bootstrap-switch, .bootstrap-switch-handle-off,
@@ -46,12 +94,10 @@ display: inline-block;
 vertical-align: baseline;
 }
 
-
 ```
 
 
 ```{r css dark mode}
-
 
 # Here we are going to make our dark mode toggle button reactive
 # So when you toggle the button we will swtich between light and dark mode
@@ -60,50 +106,106 @@ vertical-align: baseline;
 renderUI({
     
     if (input$view_mode) {
-                        # includecss() programatically includes CSS into your Shiny App
-                        includeCSS("css/styles-default.css")
+        # includecss() programatically includes CSS into your Shiny App
+        includeCSS("css/styles-default.css")
     }
     
     else {
-                # includecss() programatically includes CSS into your Shiny App
-                includeCSS("css/styles-dark.css")
+        # includecss() programatically includes CSS into your Shiny App
+        includeCSS("css/styles-dark.css")
     }
     
 })
 
-
 ```
 
 
-```{r}
+```{r database connection and data wrangling}
+
+# Connection errors can happen when your RMarkdown document is run in a different environment than your Global Environment
+# This can make it difficult to source files when working on your RMarkdown document
+# To get around this, we can create a path that is just used for debugging while we are running scripts in our Global Environment
+# Basically there's a difference between "../00_data/bikes_database.db" and "/00_data/bikes_database.db"
+# The two dots make a difference in where the data comes from
+
+
+# Here we are setting up a connection with our SQL database
+# We are going to store our connection as an object named "con"
+# dbConnect() comes from the DBI package and makes a database connection
+# SQLite() is a driver that is used to make the connection to SQLite databases
+#  "../00_data/bikes_database.db" is the actual path to the database
+# In your environment tab you should see the connection under Data
+# It will say "Formal Class SQLiteConnection"
+# setwd("C:/Users/hkalsted/OneDrive - Technomics/Desktop/DS4B_102_R_Shiny_Apps_1") will allow this line of code to run smoothly
 con <- dbConnect(RSQLite::SQLite(), "../00_data/bikes_database.db")
 # con <- dbConnect(RSQLite::SQLite(), "00_data/bikes_database.db")
 
-# dbListTables(con) 
+
+# dbListTables() simply lists the tables available in the database
+# We have three tables: bikes, bikeshops, orderlines
+# I am commenting this line of code out because the table names show up in the R Markdown document if I don't
+# dbListTables(con)
+
+
+# tbl() enables working with database tables via dplyr
+# tbl() only pulls in the first 1000 rows to show a snapshot of the database
+# When connecting with databases, tbl() does not pull the data into memory
+# It's making a reference to the database table
+# We need to use collect() to pull the table into memory (see code below)
+# collect() pulls in the entire database, not just the first 1000 rows like tbl()
+# So, bikes_tbl is a List of 2
 bikes_tbl <- tbl(con, "bikes")
+# bikeshops_tbl is a List of 2
 bikeshops_tbl <- tbl(con, "bikeshops")
+# orderlines_tbl is a List of 2
 orderlines_tbl <- tbl(con, "orderlines")
 
-processed_data_tbl <- orderlines_tbl %>%
+
+# When building Web Apps, speed is of the utmost importance
+# To improve speed, we can actually use the database to do much of the data manipulation
+# This speeds up Web Apps because SQL databases are designed for performance, whereas R is designed for flexibility
+# So here we are going to pull our orderlines_tbl, bikes_tbl, and bikeshops_tbl officially into memory
+# We will combine all of these tables into one dataframe that we will call "combined_data_tbl"
+combined_data_tbl <- orderlines_tbl %>%
+    # Joins can take a long time with large data, so should not be performed within your Web App
+    # In left_join() the left dataframe takes priority in the join
+    # So in this case the left dataframe is orderlines_tbl
+    # Here we are joining customer.id from orderlines_tbl with bikeshop.id from bikeshops_tbl
+    # Remember we are doing this in the database backend!!!
     left_join(bikeshops_tbl, by = c("customer.id" = "bikeshop.id")) %>%
+    # Here we are joining bikes.id from bikes_tbl with product.id from orderlines_tbl
     left_join(bikes_tbl, by = c("product.id" = "bike.id")) %>%
+    # Here we are going to create a new column called "extended_price"
+    # It will simply be the quantity times price
     mutate(extended_price = quantity * price) %>%
+    # collect() pulls the data from the database into R memory
+    # We officially have a 15,644 x 12 tibble after this entire process
     collect()
 
-processed_data_tbl <- processed_data_tbl %>%    
-    mutate(order.date = ymd(order.date)) %>%
-    separate(location, into = c("city", "state"), sep = ", ") %>%
-    
-    separate(description, 
-             into = c("category_1", "category_2", "frame_material"),
-             sep = " - ") %>%
-    
-    select(order.date, order.id, order.line, state, quantity, price,
-           extended_price, category_1:frame_material, bikeshop.name)
-    
-# processed_data_tbl
 
+# So now that we've brought in and joined our data together, we are going to do some data wrangling 
+# When data is imported from a database it might not be formatted in the way we actually want to use it
+processed_data_tbl <- combined_data_tbl %>%    
+    # order.date is imported as a character column. We need to convert it to a date column
+    # ymd() comes from the lubridate package and converts text in a year-month-day character data type into a date data type.
+    mutate(order.date = ymd(order.date)) %>%
+    # separate() separates a column into multiple columns using a separator
+    # So the location column has city and state together like Ithaca, NY
+    # We will separate these two values into different columns "city" and "state"
+    # We separate them by comma because that is how they are formatted in the location column
+    separate(location, into = c("city", "state"), sep = ",") %>%
+    # Here we are separating the description column into three different values
+    # These values are separated by a hyphen in the description column, so that's how we separate them individually
+    separate(description, into = c("category_1", "category_2", "frame_material"), sep = "-") %>%
+    # And now here we are selecting just the columns we want for building our dashboard
+    # We now have a 15,644 x 10 tibble
+    select(order.date, order.id, order.line, state, quantity, price, extended_price, category_1:frame_material)
+
+
+# dbDisconnect() closes the database connection
+# Now that we have the data we want, it's good practice to close the connection
 dbDisconnect(con)
+
 ```
 
 
@@ -111,40 +213,75 @@ Column {.sidebar}
 ---------------------------------------------------------------
 
 
-```{r}
+```{r user interface set up}
+
+# useShinyjs() allows us to use the javascript functionality from shinyjs in our web application
 useShinyjs(rmd = TRUE)
 
+
+# dateRangeInput() generates a date range user input that the user can specify with two dates
+# Typically used to filter date ranges
+# So you're basically going to have a small rectangle where it will give a start date, then "to" and then an end date
+# The user can then manually enter which start and end dates they want to view
 dateRangeInput(
-  inputId = "date_range", 
-  label   = h4("Date Range"),
-  start   = min(processed_data_tbl$order.date), 
-  end     = max(processed_data_tbl$order.date), 
-  min     = min(processed_data_tbl$order.date), 
-  max     = max(processed_data_tbl$order.date), 
-  startview = "month")
+    inputId = "bike_date_range", 
+    label = h4("Date Range of Bike Sales"),
+    # min/max makes sure the user enters in some valid input
+    # So, the starting date will be the minimum value of the order.date column
+    # The ending date will be the maximum value of the order.date column
+    start = min(processed_data_tbl$order.date),
+    end = max(processed_data_tbl$order.date),
+    # Then, we are setting the min/max values the same as the start/end dates
+    # Users cannot select a date earlier than the minimum value for order.date
+    # Users cannot select a date later than the maximum value for order.date
+    min = min(processed_data_tbl$order.date),
+    max = max(processed_data_tbl$order.date),
+    # So when the user goes to select the date, if it's "year" then by default they will get all twelve months in a year and then drill down
+    # If it's "month" then by default the user will be given the month and then all the days in the month to choose from
+    startview = "month"
+)
 
 
+# Here we are going to create a checkbox input based on the category_1 column in our dataset
+# checkboxGroupButtons() creates grouped buttons that act like checkboxes
+# It's arguably better looking than using checkboxGroupInput()
 shinyWidgets::checkboxGroupButtons(
-  inputId   = "checkbox_category_1", 
-  label     = h4("Bike Type"), 
-  choices   = unique(processed_data_tbl$category_1), 
-  selected  = unique(processed_data_tbl$category_1), 
-  checkIcon = list(
-    yes = icon("ok", lib = "glyphicon"),
-    no  = icon("remove", lib = "glyphicon")
-  ))
+    inputId = "checkbox_category_1",
+    label = h4("Bike Type"), 
+    # unique() returns the unique values in a vector
+    # We are going to get Mountain and Road as our options in the checkbox since as of now those are the values in the category_1 column
+    # If any new categories are added to future data, then they will automatically update here
+    # You don't need to manually enter in the choices by doing this
+    choices = unique(processed_data_tbl$category_1),
+    # The default will be that every choice is selected
+    selected = unique(processed_data_tbl$category_1),
+    # glyphicon is a different library than FontAwesome where you can get more icons for Shiny
+    # So, if the user clicks on a category, it will have a check icon next to it to indicate that it's selected
+    # If the user unselects a category, it will have an "X" icon next to it to indicated that it's not selected
+    checkIcon = list(
+        yes = icon("ok", lib = "glyphicon"),
+        no = icon("remove", lib = "glyphicon")
+    )
+)
 
+
+# Here we are going to create a picker input based on the category_2 column in our dataset
+# pickerInput() enables multi-select picker control that is great for columns with many categories
+# So, we will get a dropdown menu with the values to select on the left, and then the option to deselect them on the right
 shinyWidgets::pickerInput(
-  inputId  = "picker_category_2", 
-  label    = h4("Bike Family"), 
-  choices  = unique(processed_data_tbl$category_2), 
-  selected = unique(processed_data_tbl$category_2), 
-  multiple = TRUE,
-  options  = list(
-    `actions-box` = TRUE,
-     size = 10,
-    `selected-text-format` = "count > 3"
-  )
+    inputId = "picker_category_2", 
+    label = h4("Bike Family"),
+    # category_2 has values like "Over Mountain", "Trail", "Elite Road" and others
+    # There are many more unique values in this column than in the category_1 column
+    choices = unique(processed_data_tbl$category_2),
+    selected = unique(processed_data_tbl$category_2),
+    # multiple = TRUE allows us to make multiple selections at the same time
+    multiple = TRUE,
+    options = list(
+        `actions-box` = TRUE,
+        size = 10,
+        `selected-text-format` = "count > 3"
+    )
 )
 
 
@@ -155,12 +292,10 @@ shinyWidgets::pickerInput(
     selected = unique(processed_data_tbl$bikeshop.name),
     multiple = TRUE,
     options  = list(
-    `actions-box` = TRUE,
-     size = 10,
-    `selected-text-format` = "count > 3")
+        `actions-box` = TRUE,
+        size = 10,
+        `selected-text-format` = "count > 3")
 )
-
-
 
 
 br()
@@ -168,38 +303,45 @@ hr()
 br()
 
 
-# Forecast Mode ----
-
-
+# Here we are setting up a section for whether the use wants a forecast or not
+# Maybe the user just wants to see data as it is without needed a sales forecast
+# It will be labled "Forecast Mode"
 h4("Forecast Mode")
 
 
 # switchInput() is from Shiny Widgets
 # It's a toggle switch that comes in various styles
 # So we are going to have a switch in our dashboard that will be "on-off"
-# It will be labled "Forecast Mode"
-switchInput(inputId = "forecast_mode",
-            value = FALSE,
-            onStatus = "success",
-            onLabel = "On",
-            offLabel = "Off",
-            handleWidth = 80,
-            labelWidth = 80,
-            inline = TRUE,
-            width = "150px")
+# When the switch is on, the user will be able to make bike sales forecasts
+# When the switch is off, the user will simply view the data as it is
+switchInput(
+    inputId = "forecast_mode",
+    value = FALSE,
+    # "success" is a bootstrap color
+    onStatus = "success",
+    onLabel = "On",
+    offLabel = "Off",
+    handleWidth = 80,
+    labelWidth = 80,
+    inline = TRUE,
+    width = "150px"
+)
 
 
 # A conditionalPanel() is a panel that is hidden until a CSS element ID toggles it on
 # So this panel is going to track the Forecast Mode input we created just above
 # When we toggle the Forecast Mode to be "On", then the conditional panel will appear right below it
-# The conditional panel will be titled "Forecast Horizon"
-conditionalPanel(condition = "input.forecast_mode == 1",
-                # numericInput() enables the user to enter numeric values
-                numericInput(inputId = "n_future",
-                             label = "Forecast Horizon",
-                             value = 12,
-                             min = 1))
-
+# The conditional panel will contain a numeric input and will be titled "Forecast Horizon"
+conditionalPanel(
+    condition = "input.forecast_mode == 1",
+    # numericInput() enables the user to enter numeric values
+    numericInput(
+        inputId = "n_future",
+        label = "Forecast Horizon",
+        # We're going to make our values 1-12 since our forecast default is monthly
+        value = 12,
+        min = 1)
+)
 
 
 br()
@@ -207,58 +349,76 @@ hr()
 br()
 
 
-# Apply Buttons ----
+# An actionButton() generates an "event" when clicked
+# So here you will get a play button that says "Apply Metrics"
+# This Apply button will reactively update all of our plots and tables on the dashboard
+# Sometimes we don't want things to update automatically because there are so many variables.
+# Instead it's more coherent if we apply all the changes we want at one time
+# The play icon comes from the FontAwesome library
+actionButton(inputId = "apply_button", label = "Apply Metrics", icon = icon("play"))
 
-actionButton(inputId = "apply", label = "Apply", icon = icon("play"))
 
-actionButton(inputId = "reset", label = "Reset", icon = icon("sync"))
+# Here we are creating an action button for the Reset button
+# This Reset button will revert all of our metrics back to their default state in our dashboard
+# We will have a Play button and a Reset button
+actionButton(inputId = "reset_button", label = "Reset Metrics", icon = icon("sync"))
 
-observeEvent(eventExpr = input$reset, handlerExpr = {
-  
-  updateCheckboxGroupButtons(
-    session  = session, 
-    inputId  = "checkbox_category_1", 
-    selected = unique(processed_data_tbl$category_1))
-  
-  updatePickerInput(
-    session = session, 
-    inputId = "picker_category_2", 
-    selected = unique(processed_data_tbl$category_2))
-  
-  updatePickerInput(
-    session = session, 
-    inputId = "picker_bikeshop_name", 
-    selected = unique(processed_data_tbl$bikeshop.name) %>% sort())
-  
-  updateDateRangeInput(
-    session = session, 
-    inputId = "date_range", 
-    start   = min(processed_data_tbl$order.date), 
-    end     = max(processed_data_tbl$order.date))
-  
-  updateRadioGroupButtons(
-    session = session, 
-    inputId = "time_unit", 
-    selected = "month"
-  )
-  
-  updateSwitchInput(
-      session = session,
-      inputId = "forecast_mode",
-      value = FALSE
-  )
-  
-  updateNumericInput(
-      session = session,
-      inputId = "n_future",
-      value = 12
-  )
-  
-  shinyjs::delay(ms = 300, expr = {
-    shinyjs::click(id = "apply")
-  })
- 
-  
+
+# Here we are stating what will happen when we hit the Reset button
+observeEvent(eventExpr = input$reset_button, handlerExpr = {
+    
+    # When the reset button is clicked the checkbox button input is updated to the unique values within the category_1 column
+    updateCheckboxGroupButtons(
+        session  = session, 
+        inputId  = "checkbox_category_1", 
+        selected = unique(processed_data_tbl$category_1)
+    )
+    
+    # When the reset button is clicked the picker input value is updated to the unique values within the category_2 column
+    updatePickerInput(
+        session = session, 
+        inputId = "picker_category_2", 
+        selected = unique(processed_data_tbl$category_2)
+    )
+    
+    # When the reset button is clicked the date range input value is updated to the min/max of the order.date column
+    updateDateRangeInput(
+        session = session, 
+        inputId = "bike_date_range", 
+        start   = min(processed_data_tbl$order.date), 
+        end     = max(processed_data_tbl$order.date)
+    )
+    
+    # When the reset button is clicked, the radio button input value will be updated to "month"
+    updateRadioButtons(
+        session = session,
+        inputId = "time_unit",
+        selected = "month"
+    )
+    
+    # When the reset button is clicked, the switch input will go to "Off"
+    updateSwitchInput(
+        session = session,
+        inputId = "forecast_mode",
+        value = FALSE
+    )
+    
+    # When the reset button is clicked, the numeric input for Forecast Horizon will be updated to 12
+    updateNumericInput(
+        session = session,
+        inputId = "n_future",
+        value = 12
+    )
+    
+    # delay() delays an event by a specified time in milliseconds
+    shinyjs::delay(ms = 300, expr = {
+        # click() will simply simulate a button click
+        # apply_button is the input ID from the Play button we created
+        shinyjs::click(id = "apply_button")
+        
+    })
+    
+    
 })
 
 
@@ -281,75 +441,116 @@ switchInput(inputId = "view_mode",
             inline = TRUE,
             width = "150px")
 
-
-
-# renderPrint(input$date_range)
-
-# renderPrint(input$picker_category_2)
-
-# renderText(input$checkbox_category_1)
 ```
 
 
-```{r}
+```{r eventreactive data for entire dashboard}
+
+# eventReactive is great for responding reactively to button clicks
+# It waits until a button is clicked to run reactive code
+# So it's obviously similar to reactive() but with a slightly more specific use case
 processed_data_filtered_tbl <- eventReactive(
-  eventExpr = input$apply, 
-                                             
-  valueExpr = {
-  
-    processed_data_tbl %>%
-      
-      filter(order.date %>% between(left  = input$date_range[1], 
-                                    right = input$date_range[2])) %>%
-  
-      filter(category_1 %in% input$checkbox_category_1) %>%
-      
-      filter(category_2 %in% input$picker_category_2) %>%
-          
-      filter(bikeshop.name %in% input$picker_bikeshop_name)    
-  },
-  ignoreNULL = FALSE
+    
+    # The event expression is what starts the reactive process
+    # input$apply comes from the action button we created above
+    # So when our Apply button is clicked, then a series of events will occur (outlined below)
+    eventExpr = input$apply_button, 
+    
+    # The value expression is what the play button will run  
+    # It is the OUTCOME of the reactive process
+    valueExpr = {
+        
+        processed_data_tbl %>%
+            # We are grabbing data from inputId = "date_range", which we established up above
+            # The one in the bracket states we are going to grab the first value in our date range (that we select)
+            # The two in the second bracket states we are going to grab the second value in our date range (that we select)
+            # So, when we change the dates in our Date Range section, the data will update to reflect that date change
+            filter(order.date %>% between(left  = input$bike_date_range[1], 
+                                          right = input$bike_date_range[2])) %>%
+            # We are grabbing data from inputId = "checkbox_category_1", which we established up above
+            # We want to filter on Category 1, which is Mountain or Road
+            filter(category_1 %in% input$checkbox_category_1) %>%
+            # We are grabbing data from inputId = "picker_category_2", which we established up above
+            # This is the category with Over Mountain, Elite Road, Trail, and other values
+            filter(category_2 %in% input$picker_category_2)
+    },
+    
+    # By setting ignoreNull to False, we allow the data to be shown when we load the dashboard WITHOUT pressing any buttons
+    # So when we run the dashboard we will have a map shown with our default values
+    # Then if we want to change the map we can do so and then press the Apply Metrics button
+    ignoreNULL = FALSE
+    
 )
+
 ```
+
 
 Row {data-height=150}
 ---------------------------------------------------------------
 
-```{r}
-summary_values_tbl <- reactive({
-  
-  processed_data_filtered_tbl() %>%
-  
-    summarize(
-      health_metric = unique(order.id) %>% length(),
-      wealth_metric = sum(extended_price),
-      wise_metric   = (sum(str_detect(category_1, "Mountain")) / (sum(str_detect(category_1, "Road")) + 0.0001)) %>% 
-        round(1)
-    ) 
-  
-})
 
-# renderPrint(summary_values_tbl())
+```{r value box output data}
+
+# reactive() turns the dataframe into a reactive output that can be processed each time the user interacts with the UI components 
+summary_values_tbl <- reactive({
+    
+    processed_data_filtered_tbl() %>%
+        # Try and format summary values as text that you would want to display
+        # This makes it easy for the users to read the values in the boxes
+        summarise(
+            # Here we are creating a new column called "total_orders"
+            # We are taking all unique values of the order.id column and then counting them using length()
+            # length() counts the number of values in a vector/list
+            # This will tell us how many total orders we have in our database
+            total_orders = unique(order.id) %>% length(),
+            total_sales = sum(extended_price),
+            # Here we are creating a new column called "order_ratio"
+            # We are summing all instances of "Mountain" in the category_1 column and dividing that by the sum of all instances of "Road" in category_1
+            # Adding 0.0001 at the end helps avoid the division by zero error
+            order_ratio = sum(str_detect(category_1, "Mountain")) / (sum(str_detect(category_1, "Road")) + 0.0001)) %>%
+        round(1) 
+    # mutate(
+    #     # Here we are converting the values in total_orders and total_sales to more presentable numbers (with commas)
+    #     # For total_orders we are converting it from an integer into a character
+    #     # big.mark is a character used between every 3 digits to separate thousands so in this case we are marking it a comma
+    #     total_orders = total_orders %>% scales::number(big.mark = ","),
+    #     # We are scaling the total_sales column to a millions format with 1e-6
+    #     # We are rounding to the first decimal point with 0.1
+    #     total_sales = total_sales %>% scales::dollar(scale = 1e-6, accuracy = 0.1, suffix = "M")
+    # )
+    
+})
 
 ```
 
 
 ### Health
 
-```{r}
+
+```{r total orders value box output}
+
+# Here is our first value box
+# These value boxes will be at the very top of our dashboard lined up in a row
+# renderValueBox() enables the valueBox() to be updated with reactive data
 renderValueBox({
-  
-  valueBox(
-    value   = summary_values_tbl()$health_metric %>% scales::comma(), 
-    caption = "Orders", 
-    icon    = "fa-heartbeat", 
-    # When values less than 200, return "danger" colors
-    # When values less than 500, return "warning" colors
-    # Everything else return "success" colors
-    color   = case_when(summary_values_tbl()$health_metric < 200 ~ "danger",
-                        summary_values_tbl()$health_metric < 500 ~ "warning",
-                        TRUE ~ "success"))
-  
+    
+    # valueBox() is a special object from Flexdashboard that enables flexdashboards to have value boxes
+    valueBox(
+        value   = summary_values_tbl()$total_orders %>% scales::comma(), 
+        caption = "Orders", 
+        icon    = "fa-heartbeat", 
+        # When values less than 200, return "danger" colors
+        # When values less than 500, return "warning" colors
+        # Everything else return "success" colors
+        color   = case_when(
+            # danger = red by default
+            summary_values_tbl()$total_orders < 200 ~ "danger",
+            # warning = yellow by default
+            summary_values_tbl()$total_orders < 500 ~ "warning",
+            # success = green by default
+            TRUE ~ "success")
+    )
+    
 })
 
 
@@ -358,86 +559,92 @@ renderValueBox({
 
 ### Wealthy
 
-```{r}
+
+```{r total sales value box output}
+
 renderValueBox({
-  
-  valueBox(
-    value   = summary_values_tbl()$wealth_metric %>% scales::dollar(scale = 1e-6, suffix = "M", accuracy = 0.1), 
-    caption = "Sales", 
-    icon    = "fa-money-check-alt", 
-    color   = case_when(summary_values_tbl()$wealth_metric < 5e6 ~ "danger",
-                        summary_values_tbl()$wealth_metric < 10e6 ~ "warning",
-                        TRUE ~ "success"))
-  
+    
+    valueBox(
+        value   = summary_values_tbl()$total_sales %>% scales::dollar(scale = 1e-6, suffix = "M", accuracy = 0.1), 
+        caption = "Sales", 
+        icon    = "fa-money-check-alt", 
+        color   = case_when(
+            summary_values_tbl()$total_sales < 5e6 ~ "danger",
+            summary_values_tbl()$total_sales < 10e6 ~ "warning",
+            TRUE ~ "success")
+    )
+    
 })
+
 ```
 
 
 ### Wise
 
-```{r}
+
+```{r order ratio value box output}
+
 renderValueBox({
-  
-  valueBox(
-    value   = summary_values_tbl()$wise_metric, 
-    caption = "Ratio, Mountain to Road", 
-    icon    = "fa-brain", 
-    color   = case_when(summary_values_tbl()$wise_metric < 0.5 ~ "danger",
-                        summary_values_tbl()$wise_metric < 2.0 ~ "success",
-                        TRUE ~ "warning"))
-  
+    
+    valueBox(
+        value   = summary_values_tbl()$order_ratio, 
+        caption = "Ratio, Mountain to Road", 
+        icon    = "fa-brain", 
+        color   = case_when(
+            summary_values_tbl()$order_ratio < 0.5 ~ "danger",
+            summary_values_tbl()$order_ratio < 2.0 ~ "success",
+            TRUE ~ "warning")
+    )
+    
 })
+
 ```
 
 
 Row {data-height=850}
 ---------------------------------------------------------------
 
+
 ### By State
+
 
 ```{r}
 
 geo_plot_tbl <- reactive({
-
-  processed_data_filtered_tbl() %>%
-
-    group_by(state) %>%
-    summarise(total_revenue = sum(extended_price)) %>%
-    ungroup() %>%
-    mutate(label_text = str_glue("State: {state}
+    
+    processed_data_filtered_tbl() %>%
+        
+        group_by(state) %>%
+        summarise(total_revenue = sum(extended_price)) %>%
+        ungroup() %>%
+        mutate(label_text = str_glue("State: {state}
                                  Revenue: {scales::dollar(total_revenue)}"))
-
+    
 })
 
 
-# geo_plot_tbl <- processed_data_tbl %>%
-#     group_by(state) %>%
-#     summarise(total_revenue = sum(extended_price)) %>%
-#     ungroup() %>%
-#     mutate(label_text = str_glue("State: {state}
-#                                  Revenue: {scales::dollar(total_revenue)}"))
 ```
 
 
 ```{r}
 output$plotly_1 <- renderPlotly(expr = {
-  
-  geo_plot_tbl() %>%
-    plot_geo(locationmode = "USA-states") %>%
-    add_trace(z         = ~total_revenue, 
-              locations = ~state, 
-              color     = ~total_revenue,
-              text      = ~label_text,
-              colors    = "Blues") %>%
-    layout(
-        geo = list(
-            scope = "usa",
-            projection = list(type = "albers usa"),
-            showlakes  = TRUE,
-            lakecolor  = toRGB("white")
+    
+    geo_plot_tbl() %>%
+        plot_geo(locationmode = "USA-states") %>%
+        add_trace(z         = ~total_revenue, 
+                  locations = ~state, 
+                  color     = ~total_revenue,
+                  text      = ~label_text,
+                  colors    = "Blues") %>%
+        layout(
+            geo = list(
+                scope = "usa",
+                projection = list(type = "albers usa"),
+                showlakes  = TRUE,
+                lakecolor  = toRGB("white")
+            )
         )
-    )
-  
+    
 })
 
 plotlyOutput(outputId = "plotly_1")
@@ -445,80 +652,131 @@ plotlyOutput(outputId = "plotly_1")
 ```
 
 
-
 ### Over Time
 
-```{r}
+
+```{r radiobutton inputs for time series}
+
+# RADIOBUTTONS ARE SINGLE SELECT whereas checkboxes are multi-select
+# They make a flexible version of horizontal radio buttons
+# This input is going to be located right above our time series plot that we created below
 shinyWidgets::radioGroupButtons(
-  inputId  = "time_unit", 
-  label    = "Time Unit", 
-  choices  = c("D" = "day", "W" = "week", "M" = "month", "Q" = "quarter", "Y" = "year"), 
-  selected = "month", 
-  status   = "primary", 
-  justified = TRUE, 
-  checkIcon = list(
-    yes = icon("ok", lib = "glyphicon"), 
-    no  = NULL
-    )
+    inputId = "time_unit", 
+    label = "Time Series Unit",
+    # "D" is what will show on our radiobutton
+    # "day" is what is going to be returned when the user clicks on "D"
+    # Meaning the time series plot will be a visualization of daily bike sales
+    # We need to map data to "day" 
+    choices = c("D" = "day",
+                "W" = "week",
+                "M" = "month",
+                "Q" = "quarter",
+                "Y" = "year"),
+    # This is what will be selected by default
+    # We are choosing "month" in this case
+    selected = "month",
+    # status gives colors to the radiobuttons
+    # It comes from the standard Bootstrap Color Theme
+    # primary is blue background with white for the letters
+    # There's "success", "info", "warning" and other themes
+    status = "primary",
+    # justified spreads the radiobuttons out over the column width they are associated with
+    justified = TRUE,
+    # Here we are adding an actual checkmark to our radiobuttons to show which value we've selected clearly 
+    # So values that are selected will have a checkmark, and those not selected will have no icon associated with them
+    checkIcon = list(yes = icon("ok", lib = "glyphicon"),
+                     no = NULL)
 )
 
 
+# So whenever our user clicks on one of the time units for the time series plot...
 observeEvent(eventExpr = input$time_unit, {
     
+    # Here we are checking if the forecast mode is On
     if(input$forecast_mode) {
-        delay(300, click(id = "apply"))
-    }
-})
-
-
-observeEvent(eventExpr = input$forecast_mode, {
-    if(input$forecast_mode) {
-        delay(300, click(id = "apply"))
+        
+        # So when the user clicks a time unit AND the forecast mode is on, it will automatically click the Apply Metrics button
+        # However, we are implementing a 300 millisecond delay
+        # The click() function is simulating a clicking action with JavaScript
+        delay(300, click(id = "apply_button"))
         
     }
-    # If you want the code to only fire the first time, set once = TRUE
-    # This prevents the forecast from firing every time the user toggles when it only needs to happen the 1st time
-}, once = TRUE)
+    
+})
+
+# So whenever our user toggles on or off the forecast switch...
+observeEvent(eventExpr = input$forecast_mode, {
+    
+        # So when the user toggles the forecast switch, it will automatically click the Apply Metrics button
+        # However, we are implementing a 300 millisecond delay
+        # The click() function is simulating a clicking action with JavaScript
+        delay(300, click(id = "apply_button"))
+        
+}, 
+
+# If you want the code to only fire the first time, set once = TRUE
+# This prevents the forecast from firing every time the user toggles when it only needs to happen the 1st time
+once = TRUE)
+
 ```
 
 
-```{r}
+```{r time series plotting}
 
-
+# Here we are setting up our basic and non-forecasted data that will be used in the time series plot
 time_plot_tbl <- reactive({
-  
-  processed_data_filtered_tbl() %>%
-      aggregate_time_series(time_unit = input$time_unit)
-  
+    
+    processed_data_filtered_tbl() %>%
+        # Our time unit inputs are daily, weekly, monthly, and quarterly
+        # aggregate_time_series() is a custom function we created
+        aggregate_time_series(time_unit = input$time_unit)
+    
 })
 
-time_plot_predictions_tbl <- eventReactive(eventExpr = input$apply, {
-  
-  if (input$forecast_mode) {
-    time_plot_tbl() %>%
-      generate_forecast(n_future = input$n_future, seed = 123)
-  }
-  
+# Here we are setting up our forecasted time series data
+# The forecast will start when the user hits the "Apply Metrics" button
+time_plot_predictions_tbl <- eventReactive(eventExpr = input$apply_button, {
+    
+    # We are first checking if the user hit "On" for the forecast mode
+    if (input$forecast_mode) {
+        
+        # If they did, then we will will apply our time series model to our staged data and create forecasted values
+        time_plot_tbl() %>%
+            # generate_forecast() is a custom function we created
+            generate_forecast(n_future = input$n_future, seed = 123)
+        
+    }
+    
 })
 
-# renderPrint(time_plot_predictions_tbl())
 
-output$plotly_2 <- renderPlotly({
+# Here is the UI setup for the time series plot
+plotlyOutput(outputId = "time_series_plot")
 
-  if (input$forecast_mode) {
-    p <- time_plot_predictions_tbl() %>%
-      plot_forecast()
-  } else {
-    p <- time_plot_tbl() %>%
-      plot_time_series()
-  }
-  
-  p %>%
-    layout(margin = list(b = 200))
-
+# Here is the server side setup for the time series plot
+output$time_series_plot <- renderPlotly({
+    
+    # So if forecast mode is On...
+    if (input$forecast_mode) {
+        
+        # We will plot a forecast of our data
+        p <- time_plot_predictions_tbl() %>%
+            plot_forecast()
+        
+    } else {
+        
+        # Otherwise we will plot a simple time series
+        p <- time_plot_tbl() %>%
+            plot_time_series()
+        
+    }
+    
+    p %>%
+        # The "b" stands for "bottom"
+        # So we have a bottom margin of 200
+        # Gives nicer spacing within the section of where this chart is portrayed
+        layout(margin = list(b = 200))
+    
 })
 
-plotlyOutput(outputId = "plotly_2")
-
-  
 ```
