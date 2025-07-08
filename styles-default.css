@@ -1,37 +1,31 @@
-
-/* FONTS */
-@import url('https://fonts.googleapis.com/css?family=Montserrat:600|Roboto:300&display=swap');
-
-.navbar-brand {
-    font-family: "Montserrat", sans-serif;
-}
-
-h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
-    font-family: "Montserrat", sans-serif;
-    color: #2c3e50;
-}
-
-body {
-    font-family: 'Roboto', sans-serif;
-    color: #2c3e50;
-}
-
 /* NAVBAR */
 .navbar-inverse {
+    /* We are making the background color of our Navigation Bar to be charcoal blue */
     background-color: #2c3e50;
+    /* We are making the color of the border around our Navigation Bar to be white */
     border-color: #fff;
-}
-
-.navbar-logo {
-    width: 50px;
 }
 
 
 /* SIDEBAR */
-.section.sidebar {
+.section.sidebar{
+    top: 51px;
+    /* We are making the background color of our Sidebar to be gainsboro grey */
     background-color: #dddddd;
 }
 
+#dashboard-container {
+    /* We are adjusting the padding of our Sidebar (relative to the homepage) so our inputs are easier to read */
+    /* The !imporant tells CSS to override the defaults */
+    padding-left: 350px !important;
+}
+
+.sidebar{
+    /* And now we are increasing the width of our sidebar to fill in that padding we made above */
+    width: 350px !important;
+}
+
+/* Here we are adjusting our sidebar size for mobile screens! */
 @media screen and (min-width: 767px) {
     #dashboard-container {
         padding-left: 350px !important;
@@ -42,7 +36,7 @@ body {
     }
 }
 
-
+/* Here we are allowing for scroll bars for mobile screens */
 @media screen and (max-width: 767px) {
     .chart-shim {
         overflow-y: scroll;
@@ -50,42 +44,104 @@ body {
 }
 
 
+/* LOGO */
+.navbar-logo{
+    /* We are making the size of our logo to be 50px so it fits nicer within the app */
+    width: 50px;
+}
+
+
+/* FONTS */
+/* If you go to fonts.google.com there are many font styles you can incorporate into your Shiny app */
+/* So here we are importing the Montserrat and Roboto font styles from the fonts.google.com website */
+@import url('https://fonts.googleapis.com/css?family=Montserrat:600|Roboto:300&display=swap');
+
+
+/* LOGO FONT */
+.navbar-brand{
+    /* We are making the style of font in our Navigation Bar to be Montserrat */
+    /* So our title Price Prediction App will be formatted with Montserrat font style */
+    font-family: "Montserrat", Sans-Serif;
+}
+
+
+/* HEADERS */
+h1,h2,h3,h4,h5,h6,.h1,.h2,.h3,.h4,.h5,.h6 {
+    /* We are making the font style of our various headers to be Montserrat font style */
+    font-family: "Montserrat", Sans-Serif;
+    /* We are making the color of our various headers to be charcoal blue */
+    color: #2c3e50;
+}
+
+
+/* BODY */
+body {
+    /* We are making the font style of our body text to be Roboto font style */
+    font-family: "Roboto", Sans-Serif;
+    /* We are making the color of our body text to be charcoal blue */
+    color: #2c3e50;
+}
+
 
 /* SWITCH */
-.bootstrap-switch .bootstrap-switch-handle-off.bootstrap-switch-success, .bootstrap-switch .bootstrap-switch-handle-on.bootstrap-switch-success {
+.bootstrap-switch 
+.bootstrap-switch-handle-off.bootstrap-switch-success, 
+.bootstrap-switch .bootstrap-switch-handle-on.bootstrap-switch-success {
+    /* We are making the color of our toggle button to be green */
     color: #fff;
     background: #18bc9c;
 }
 
 
-/* BUTTONS */
+/* BUTTONS (Default) */
+
+/* .btn-default is the default style of action button */
+/* .btn-primary, .btn-success, .btn-info are others */
 .btn-default {
+    /* Making the text color of our action buttons to be white */
     color: #ffffff;
+    /* Making the background color of our action buttons to be charcoal blue */
     background-color: #2c3e50;
+    /* Making the border color of our action buttons to be charcoal blue */
     border-color: #2c3e50
 }
 
+/* .btn-default:focus styles apply when the button is focused, such as using the keyboard’s tab key or if it was focused via JavaScript */
 .btn-default:focus,.btn-default.focus {
+     /* Making the text color of our action buttons to be white */
     color: #ffffff;
+    /* Making the background color of our action buttons to be a slighly darker blue than charcoal blue */
     background-color: #233140;
+    /* Making the border color of our action buttons to be a slighly darker blue than charcoal blue */
     border-color: #233140
 }
 
+/* .btn-default:hover styles apply when you move the mouse cursor over the button. */
 .btn-default:hover {
+     /* Making the text color of our action buttons to be white */
     color: #ffffff;
+    /* Making the background color of our action buttons to be a slighly darker blue than charcoal blue */
     background-color: #233140;
+    /* Making the border color of our action buttons to be a slighly darker blue than charcoal blue */
     border-color: #233140
 }
 
+/* .btn-default:active is applied to a button while it’s being “activated” by a user—i.e., when they are in the process of clicking or touching the button (holding down the mouse button, finger, or equivalent) */
 .btn-default:active,.btn-default.active,.open>.dropdown-toggle.btn-default {
+     /* Making the text color of our action buttons to be white */
     color: #ffffff;
+    /* Making the background color of our action buttons to be a slighly darker blue than charcoal blue */
     background-color: #233140;
+    /* Making the border color of our action buttons to be a slighly darker blue than charcoal blue */
     border-color: #233140
 }
 
 .btn-default:active:hover,.btn-default.active:hover,.open>.dropdown-toggle.btn-default:hover,.btn-default:active:focus,.btn-default.active:focus,.open>.dropdown-toggle.btn-default:focus,.btn-default:active.focus,.btn-default.active.focus,.open>.dropdown-toggle.btn-default.focus {
+     /* Making the text color of our action buttons to be white */
     color: #ffffff;
+    /* Making the background color of our action buttons to be a slighly darker blue than charcoal blue */
     background-color: #233140;
+    /* Making the border color of our action buttons to be a slighly darker blue than charcoal blue */
     border-color: #233140
 }
 
@@ -104,7 +160,7 @@ body {
 }
 
 
-/* BUTTON - SUCCESS */
+/* BUTTONS (Success) */
 
 .btn-success {
     color: #ffffff;
@@ -150,6 +206,7 @@ body {
     background-color: #ffffff
 }
 
+
 /* VALUE BOXES */
 
 .bg-danger {
@@ -163,11 +220,3 @@ body {
 .bg-warning {
     background-color: #FF7F00;
 }
-
-
-
-
-
-
-
-

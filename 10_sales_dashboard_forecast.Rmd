@@ -5,7 +5,7 @@ output:
     orientation: rows
     vertical_layout: fill
     css: css/styles-default.css
-    logo: business-science-logo.png
+    logo: img/business-science-logo.png
 runtime: shiny
 ---
 
@@ -39,6 +39,21 @@ runtime: shiny
 # css: css/styles-default.css is how we import our custom CSS styling we set up
 
 # logo: img/business-science-logo.png is how we can add a logo to our app
+
+```
+
+
+```{r dashboard purpose}
+
+# 1. You can find bike sales data by date
+
+# 2. You can find bike sales data by bike type (mountain vs. road)
+
+# 3. You can find bike sales data by bike family (nine choices)
+
+# 4. You can find bike sales data by the bikeshop customers
+
+# 5. You can also generate a bike sales data forecast
 
 ```
 
@@ -100,19 +115,23 @@ vertical-align: baseline;
 ```{r css dark mode}
 
 # Here we are going to make our dark mode toggle button reactive
-# So when you toggle the button we will swtich between light and dark mode
+# So when you toggle the button we will switch between light and dark mode
 
 # renderUI() is used to render HTML or CSS reactively (based on user input)
 renderUI({
     
     if (input$view_mode) {
+        
         # includecss() programatically includes CSS into your Shiny App
         includeCSS("css/styles-default.css")
+        
     }
     
     else {
+        
         # includecss() programatically includes CSS into your Shiny App
         includeCSS("css/styles-dark.css")
+        
     }
     
 })
@@ -199,7 +218,7 @@ processed_data_tbl <- combined_data_tbl %>%
     separate(description, into = c("category_1", "category_2", "frame_material"), sep = "-") %>%
     # And now here we are selecting just the columns we want for building our dashboard
     # We now have a 15,644 x 10 tibble
-    select(order.date, order.id, order.line, state, quantity, price, extended_price, category_1:frame_material)
+    select(order.date, order.id, order.line, state, quantity, price, extended_price, category_1:frame_material, bikeshop.name)
 
 
 # dbDisconnect() closes the database connection
@@ -285,16 +304,21 @@ shinyWidgets::pickerInput(
 )
 
 
+# Here we are creating a picker input based on the bikeshop.name column in our dataset
+# These are the customers
 shinyWidgets::pickerInput(
     inputId = "picker_bikeshop_name", 
     label = h4("Bike Shop (Customer)"),
-    choices = unique(processed_data_tbl$bikeshop.name),
-    selected = unique(processed_data_tbl$bikeshop.name),
+    # We want the names sorted so it's easier to choose from
+    choices = unique(processed_data_tbl$bikeshop.name) %>% sort(),
+    # By default we will have all of the customers selected
+    selected = unique(processed_data_tbl$bikeshop.name) %>% sort(),
     multiple = TRUE,
     options  = list(
         `actions-box` = TRUE,
         size = 10,
-        `selected-text-format` = "count > 3")
+        `selected-text-format` = "count > 3"
+    )
 )
 
 
@@ -381,6 +405,13 @@ observeEvent(eventExpr = input$reset_button, handlerExpr = {
         selected = unique(processed_data_tbl$category_2)
     )
     
+    # When the reset button is clicked the picker input value is updated to the unique values within the bikeshop.name column
+    updatePickerInput(
+        session = session, 
+        inputId = "picker_bikeshop_name", 
+        selected = unique(processed_data_tbl$bikeshop.name) %>% sort()
+    )
+    
     # When the reset button is clicked the date range input value is updated to the min/max of the order.date column
     updateDateRangeInput(
         session = session, 
@@ -427,10 +458,13 @@ hr()
 br()
 
 
-# Here we are adding a Dark Mode button
-# It will be a similar toggle to the Forecast Mode we have
 h5("View Mode")
-switchInput(inputId = "view_mode",
+
+# Here we are adding a button to switch between modes of the dashboard
+# It will be a similar toggle to the Forecast Mode we have
+# It will allow users to switch between dashboard themes of light and dark
+switchInput(
+    inputId = "view_mode",
             value = TRUE,
             onStatus = "success",
             offStatus = "primary",
@@ -439,10 +473,10 @@ switchInput(inputId = "view_mode",
             handleWidth = 80,
             labelWidth = 80,
             inline = TRUE,
-            width = "150px")
+            width = "150px"
+    )
 
 ```
-
 
 ```{r eventreactive data for entire dashboard}
 
@@ -472,7 +506,10 @@ processed_data_filtered_tbl <- eventReactive(
             filter(category_1 %in% input$checkbox_category_1) %>%
             # We are grabbing data from inputId = "picker_category_2", which we established up above
             # This is the category with Over Mountain, Elite Road, Trail, and other values
-            filter(category_2 %in% input$picker_category_2)
+            filter(category_2 %in% input$picker_category_2) %>%
+            # We are grabbing data from inputId = "picker_bikeshop_name", which we established up above
+            # These are the bikeshop customers
+            filter(bikeshop.name %in% input$picker_bikeshop_name)
     },
     
     # By setting ignoreNull to False, we allow the data to be shown when we load the dashboard WITHOUT pressing any buttons
@@ -565,11 +602,15 @@ renderValueBox({
 renderValueBox({
     
     valueBox(
+        # Making the scale = 1e-6 allows us to present the data in millions
+        # We round to one decimal using accuracy = 0.1
         value   = summary_values_tbl()$total_sales %>% scales::dollar(scale = 1e-6, suffix = "M", accuracy = 0.1), 
         caption = "Sales", 
         icon    = "fa-money-check-alt", 
         color   = case_when(
+            # 5e6 is shorthand for $5,000,000 so sales below that are in danger
             summary_values_tbl()$total_sales < 5e6 ~ "danger",
+            # 10e6 is shorthand for $10,000,000 so sales below that are in warning
             summary_values_tbl()$total_sales < 10e6 ~ "warning",
             TRUE ~ "success")
     )
@@ -577,7 +618,6 @@ renderValueBox({
 })
 
 ```
-
 
 ### Wise
 
@@ -613,7 +653,6 @@ Row {data-height=850}
 geo_plot_tbl <- reactive({
     
     processed_data_filtered_tbl() %>%
-        
         group_by(state) %>%
         summarise(total_revenue = sum(extended_price)) %>%
         ungroup() %>%
@@ -627,6 +666,7 @@ geo_plot_tbl <- reactive({
 
 
 ```{r}
+
 output$plotly_1 <- renderPlotly(expr = {
     
     geo_plot_tbl() %>%
@@ -679,7 +719,8 @@ shinyWidgets::radioGroupButtons(
     # It comes from the standard Bootstrap Color Theme
     # primary is blue background with white for the letters
     # There's "success", "info", "warning" and other themes
-    status = "primary",
+    # So we switched this to success and then there's changes we made in the styles-default.css file for "success" buttons
+    status = "success",
     # justified spreads the radiobuttons out over the column width they are associated with
     justified = TRUE,
     # Here we are adding an actual checkmark to our radiobuttons to show which value we've selected clearly 
@@ -707,11 +748,11 @@ observeEvent(eventExpr = input$time_unit, {
 # So whenever our user toggles on or off the forecast switch...
 observeEvent(eventExpr = input$forecast_mode, {
     
-        # So when the user toggles the forecast switch, it will automatically click the Apply Metrics button
-        # However, we are implementing a 300 millisecond delay
-        # The click() function is simulating a clicking action with JavaScript
-        delay(300, click(id = "apply_button"))
-        
+    # So when the user toggles the forecast switch, it will automatically click the Apply Metrics button
+    # However, we are implementing a 300 millisecond delay
+    # The click() function is simulating a clicking action with JavaScript
+    delay(300, click(id = "apply_button"))
+    
 }, 
 
 # If you want the code to only fire the first time, set once = TRUE
