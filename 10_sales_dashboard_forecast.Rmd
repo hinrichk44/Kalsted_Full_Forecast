@@ -465,16 +465,16 @@ h5("View Mode")
 # It will allow users to switch between dashboard themes of light and dark
 switchInput(
     inputId = "view_mode",
-            value = TRUE,
-            onStatus = "success",
-            offStatus = "primary",
-            onLabel = "Light",
-            offLabel = "Dark",
-            handleWidth = 80,
-            labelWidth = 80,
-            inline = TRUE,
-            width = "150px"
-    )
+    value = TRUE,
+    onStatus = "success",
+    offStatus = "primary",
+    onLabel = "Light",
+    offLabel = "Dark",
+    handleWidth = 80,
+    labelWidth = 80,
+    inline = TRUE,
+    width = "150px"
+)
 
 ```
 
@@ -661,21 +661,37 @@ geo_plot_tbl <- reactive({
     
 })
 
-
 ```
 
 
-```{r}
+```{r bike sales map}
 
-output$plotly_1 <- renderPlotly(expr = {
-    
+# Here we are setting up the UI for our map
+plotlyOutput(outputId = "state_revenue_plot")
+
+
+# Here we are actually rendering our map
+output$state_revenue_plot <- renderPlotly(expr = {
+
+    # Here we are making a map of the bike sales accumulated by state
     geo_plot_tbl() %>%
+        # plot_geo() makes interactive chloropleth maps using plotly
+        # Chloropleth Maps cover geographic boundaries
+        # You must have an internet connection to view the map
+        # On its own, plot_geo() will gave you a map of the world with nothing filled in
+        # When we add in locationmode = "USA-states" then plotly knows we are going to annotate a map of the USA
         plot_geo(locationmode = "USA-states") %>%
-        add_trace(z         = ~total_revenue, 
-                  locations = ~state, 
-                  color     = ~total_revenue,
-                  text      = ~label_text,
-                  colors    = "Blues") %>%
+        # add_trace() can add different types of traces like scatter, markers, lines text, etc
+        # This is how we turn the blank USA map into something with outlines and colors
+        add_trace(
+            z         = ~total_revenue,
+            locations = ~state,
+            color     = ~total_revenue,
+            text      = ~label_text,
+            # "Blues" comes from the Brewer color palette
+            colors    = "Blues"
+        ) %>%
+        # layout() modifies the layout of a plotly visualization
         layout(
             geo = list(
                 scope = "usa",
@@ -684,10 +700,8 @@ output$plotly_1 <- renderPlotly(expr = {
                 lakecolor  = toRGB("white")
             )
         )
-    
-})
 
-plotlyOutput(outputId = "plotly_1")
+})
 
 ```
 
